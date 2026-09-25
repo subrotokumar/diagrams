@@ -25,7 +25,7 @@ from diagrams.programming.flowchart import (
     Merge,
     Preparation,
     Sort,
-)  # stand-ins: HyDE rewrite, RRF, reranker
+)
 from diagrams.programming.framework import Angular, React, Vue
 from diagrams.programming.language import Bash, Python
 from diagrams.saas.crm import Zendesk  # stand-in: ServiceNow / Jira / HR ticketing
@@ -185,6 +185,9 @@ with Diagram(
     llm << router
 
     with Cluster("DevOps"):
+        cloud = Component("Cloud Infrastructure", "clouds")
+
+        infra_repo = Component("Infra Repository", "gitlab")
         codebase = Component("Codebase\nRepository", "gitlab")
         helm = Component("Helm Chart\nRepository", "helm")
         argocd = Component("ArgoCD", "argocd")
@@ -201,13 +204,23 @@ with Diagram(
                 cm = ConfigMap("Configmap")
                 sk = Secret("Secrets")
 
-        with Cluster("Multi Environment Deployment Pipeline"):
+        with Cluster("Multi Environment CI/CD Pipeline"):
             gitlab_ci = Gitlabci("Gitlab")
-            with Cluster("CI/CD Pipeline"):
+            with Cluster("Application\nDeployment Pipeline"):
                 cicd = Bash(
                     "lint\ntest\npackage\nsecurity\nImage Push\nUpdate Helm Chart"
                 )
-                (codebase >> gitlab_ci >> cicd >> helm >> argocd >> k8s)
+            with Cluster("IaC Pipeline"):
+                iac = Bash("Plan\nApply")
+        (
+            infra_repo
+            >> gitlab_ci
+            >> Edge(label="Merging the PR")
+            >> iac
+            >> Component("Infrastructure\nAs Code", "terraform")
+            >> cloud
+        )
+        (codebase >> gitlab_ci >> cicd >> helm >> argocd >> k8s)
         cicd >> registry >> k8s >> deploy
         (vault >> eso >> Edge(label="Sync") >> sk >> reloader >> deploy)
         cm >> reloader
