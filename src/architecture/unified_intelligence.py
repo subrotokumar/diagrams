@@ -1,11 +1,16 @@
 from typing import Literal
 
+from diagrams.aws.compute import ECR
 from diagrams.aws.ml import Bedrock
 from diagrams.azure.aimachinelearning import (
     AzureOpenai,
     MachineLearning,
-)  # stand-in: RAGAS evaluation
+)
 from diagrams.custom import Custom
+from diagrams.k8s import K8S
+from diagrams.k8s.compute import Deploy, Pod
+from diagrams.k8s.podconfig import ConfigMap, Secret
+from diagrams.onprem.ci import Gitlabci
 from diagrams.onprem.client import Client, Users
 from diagrams.onprem.inmemory import Redis
 from diagrams.onprem.logging import Loki
@@ -16,11 +21,13 @@ from diagrams.onprem.security import Vault  # stand-in: Zanzibar-style permissio
 from diagrams.onprem.tracing import Tempo
 from diagrams.programming.flowchart import (
     Database,
+    InternalStorage,
     Merge,
     Preparation,
     Sort,
 )  # stand-ins: HyDE rewrite, RRF, reranker
-from diagrams.programming.language import Python
+from diagrams.programming.framework import Angular, React, Vue
+from diagrams.programming.language import Bash, Python
 from diagrams.saas.crm import Zendesk  # stand-in: ServiceNow / Jira / HR ticketing
 
 from diagrams import Cluster, Diagram, Edge
@@ -28,8 +35,8 @@ from diagrams import Cluster, Diagram, Edge
 
 def Component(label="", icon: str = "", ext: Literal["png", "jpg", "svg"] = "png"):
     if "." in icon:
-        return Custom(label=label, icon_path=f"../public/{icon.lower()}")
-    return Custom(label=label, icon_path=f"../public/{icon.lower()}.{ext}")
+        return Custom(label=label, icon_path=f"../icons/{icon.lower()}")
+    return Custom(label=label, icon_path=f"../icons/{icon.lower()}.{ext}")
 
 
 graph_attr = {
@@ -54,28 +61,34 @@ with Diagram(
     edge_attr=edge_attr,
     outformat="png",
 ):
-    user = Users("End User")
-    ragas = MachineLearning("RAGAS Eval\n(faithfulness, relevance,\ncontext precision)")
+    files = Component("Files", "files")
+    dev_sre = Users("DEV/SRE")
+    eval = MachineLearning("Eval\n(faithfulness, relevance,\ncontext precision)")
+    react = React("Client")
 
-    with Cluster("Agent Interface"):
-        supervisor = Python("Multi-Agent\nSupervisor")
+    with Cluster("Agent Service"):
+        supervisor = Component("Multi-Agent\nSupervisor", "langgraph")
 
         with Cluster("Rag Agent Handoff"):
-            agent1 = Python("RAG Agent")
+            agent1 = Component("RAG Agent", "langgraph")
             llm = Python("LLM")
             tools = Python("Tools")
 
-        agent2 = Python("HR Agent")
-        agent3 = Python("Jira Agent")
+        agent2 = Component(
+            "HR Agent\nJira Agent\nSolution Architect Agent\nSupport Agent\nBA Agent",
+            "langgraph",
+        )
+        MCPs = Component("Mcp", "mcp")
 
         agent1 >> llm >> Edge(label="action") >> tools
         tools >> Edge(label="feedback") >> llm
 
-        user >> supervisor >> [agent1, agent2, agent3]
+        supervisor >> [MCPs, agent1, agent2]  # , agent3, agent4, agent5]
 
     with Cluster("Ingestion Pipeline (scale-to-zero, KEDA)"):
-        upload = Client("Presigned URL\nUpload")
-        storage = Component("Object Storage", "s3")
+        with Cluster("Document Ingestion"):
+            presigned_url = Client("Presigned URL\nUpload")
+            storage = Component("Object Storage", "s3")
         kafka = Kafka("Message Broker\n(upload events)")
         workers = Component("KEDA-scaled\nIngestion Workers", "keda")
 
@@ -102,37 +115,24 @@ with Diagram(
                 emb_image = Component("Image\nEmbedding\n[f1,f2,...fn]", "numpy")
                 image_data >> image_summary >> emb_image
 
-        with Cluster("VectorDB"):
-            aisearch = Database("Image\nCollection")
-            pgvector = Database("Text\nCollection")
-            opensearch = Database("Table Collection")
-        vectordb = [aisearch, pgvector, opensearch]
-        emb_image >> aisearch
-        emb_text >> pgvector
-        emb_table >> opensearch
-
-        upload >> storage >> kafka >> workers >> docling
-        docling >> [text_data, table_data, image_data]
+    with Cluster("VectorDB"):
+        aisearch = Database("Image\nCollection")
+        pgvector = Database("Text\nCollection")
+        opensearch = Database("Table Collection")
 
     otel = Component("OTel", "otel")
-    with Cluster("LGTM Stack", direction="RL") as lgtm:
-        with Cluster():
+
+    with Cluster("Observability", direction="RL") as lgtm:
+        grafana = Grafana("Grafana")
+        with Cluster(""):
             loki = Loki("Loki")
             tempo = Tempo("Tempo")
             prom = Prometheus("Prometheus")
-
-        grafana = Grafana("Grafana")
-
-        grafana >> loki
-        grafana >> prom
-        grafana >> tempo
+        grafana << loki
+        grafana << prom
+        grafana << tempo
 
     otel >> [loki, prom, tempo]
-
-    with Cluster("Access Control (Zanzibar-style)"):
-        sources = Zendesk("ServiceNow / Jira /\nHR Platform")
-        permissions = Vault("Relationship-based\nPermission Engine")
-        sources >> Edge(label="live relationships") >> permissions
 
     with Cluster("LLM Gateway"):
         openai = AzureOpenai("OpenAI")
@@ -146,22 +146,69 @@ with Diagram(
             >> router
         )
 
-    with Cluster("Query-Time Pipeline"):
+    with Cluster("Retrieval Pipeline"):
         cache = Redis("Semantic Cache")
         hyde = Preparation("HyDE Query\nRewrite")
         with Cluster("Hybrid Search"):
-            dense = Component("Dense Vector\nSearch", "langchain")
+            dense = InternalStorage("Dense Vector\nSearch")
             bm25 = Solr("Sparse BM25\nSearch")
         rrf = Merge("Reciprocal Rank\nFusion\n(RRF)")
         reranker = Sort("Cross-Encoder\nReranker")
 
-        router >> otel
-        tools >> Edge(label="query") >> cache
-        cache >> Edge(label="hit", style="dashed") >> tools
-        cache >> Edge(label="miss") >> hyde
-        vectordb >> Edge(style="dashed", label="indexed chunks") >> dense
-        vectordb >> Edge(style="dashed") >> bm25
-        [dense, bm25] >> rrf >> reranker
-        router >> supervisor
-        permissions >> Edge(label="post-check") >> supervisor
-        (router >> Edge(style="dotted", label="scored") >> ragas)
+    with Cluster("Access Control (Zanzibar-style)"):
+        sources = Zendesk("ServiceNow / Jira /\nHR Platform")
+        permissions = Vault("Relationship-based\nPermission Engine")
+        sources >> Edge(label="live relationships") >> permissions
+
+    user = Users("Users")
+    user >> files
+    user >> react
+    react >> supervisor
+    vectordb = [aisearch, pgvector, opensearch]
+    emb_image >> aisearch
+    emb_text >> pgvector
+    emb_table >> opensearch
+    supervisor >> eval
+    storage >> Edge(label="Upload Event") >> kafka >> workers >> docling
+    docling >> [text_data, table_data, image_data]
+    # router >> otel
+    tools >> Edge(label="query") >> cache
+    cache >> Edge(label="hit", style="dashed") >> tools
+    cache >> Edge(label="miss") >> hyde
+    vectordb >> Edge(style="dashed", label="indexed chunks") >> dense
+    vectordb >> Edge(style="dashed") >> bm25
+    [dense, bm25] >> rrf >> reranker
+    router >> supervisor
+    permissions >> Edge(label="post-check") >> supervisor
+    (files >> presigned_url << Edge(label="Signed URL") << storage)
+    presigned_url >> Edge(label="Uploading file") >> storage
+    llm << router
+
+    with Cluster("DevOps"):
+        codebase = Component("Codebase\nRepository", "gitlab")
+        helm = Component("Helm Chart\nRepository", "helm")
+        argocd = Component("ArgoCD", "argocd")
+        vault = Vault("Secret Vault")
+        registry = ECR("Image Registry")
+
+        with Cluster("Kubernetes Cluster"):
+            istio = Component("Gateway API", "istio")
+            k8s = K8S("Kubernetes")
+            reloader = Pod("Reloader")
+            eso = Component("ESO", "eso")
+            with Cluster("Application"):
+                deploy = Deploy("Deployment")
+                cm = ConfigMap("Configmap")
+                sk = Secret("Secrets")
+
+        with Cluster("Multi Environment Deployment Pipeline"):
+            gitlab_ci = Gitlabci("Gitlab")
+            with Cluster("CI/CD Pipeline"):
+                cicd = Bash(
+                    "lint\ntest\npackage\nsecurity\nImage Push\nUpdate Helm Chart"
+                )
+                (codebase >> gitlab_ci >> cicd >> helm >> argocd >> k8s)
+        cicd >> registry >> k8s >> deploy
+        (vault >> eso >> Edge(label="Sync") >> sk >> reloader >> deploy)
+        cm >> reloader
+        dev_sre << grafana
