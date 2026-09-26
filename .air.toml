@@ -8,7 +8,7 @@ tmp_dir = "diagrams"
 [build]
   args_bin = []
   bin = ""
-  cmd = "uv run src/architecture/unified_intelligence.py"
+  cmd = "uv run src/architecture/devops.py"
   delay = 1000
   entrypoint = [""]
   exclude_dir = ["assets", "tmp", "vendor", "testdata"]

@@ -1,12 +1,9 @@
-from typing import Literal
-
 from diagrams.aws.compute import ECR
 from diagrams.aws.ml import Bedrock
 from diagrams.azure.aimachinelearning import (
     AzureOpenai,
     MachineLearning,
 )
-from diagrams.custom import Custom
 from diagrams.k8s import K8S
 from diagrams.k8s.compute import Deploy, Pod
 from diagrams.k8s.podconfig import ConfigMap, Secret
@@ -26,31 +23,12 @@ from diagrams.programming.flowchart import (
     Preparation,
     Sort,
 )
-from diagrams.programming.framework import Angular, React, Vue
+from diagrams.programming.framework import React
 from diagrams.programming.language import Bash, Python
 from diagrams.saas.crm import Zendesk  # stand-in: ServiceNow / Jira / HR ticketing
 
+from architecture import Component, edge_attr, graph_attr
 from diagrams import Cluster, Diagram, Edge
-
-
-def Component(label="", icon: str = "", ext: Literal["png", "jpg", "svg"] = "png"):
-    if "." in icon:
-        return Custom(label=label, icon_path=f"../icons/{icon.lower()}")
-    return Custom(label=label, icon_path=f"../icons/{icon.lower()}.{ext}")
-
-
-graph_attr = {
-    "rankdir": "LR",
-    "splines": "ortho",
-    "nodesep": "1.0",
-    "ranksep": "1.2",
-    "pad": "0.5",
-    "margin": "15",
-    "compound": "true",
-}
-edge_attr = {
-    "fontsize": "10",
-}
 
 with Diagram(
     "Unified Intelligence Platform",
