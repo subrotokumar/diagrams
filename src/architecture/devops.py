@@ -1,22 +1,20 @@
-from diagrams import Cluster, Diagram, Edge
-
-from diagrams.k8s.compute import Deploy, Pod
 from diagrams.k8s.clusterconfig import Quota
+from diagrams.k8s.compute import Deploy, Pod
 from diagrams.k8s.network import Service
 from diagrams.k8s.podconfig import ConfigMap, Secret
 from diagrams.k8s.rbac import RB, SA, Role
-
 from diagrams.onprem.ci import GitlabCI
+from diagrams.onprem.client import Users
 from diagrams.onprem.logging import Loki
 from diagrams.onprem.monitoring import Grafana, Prometheus
 from diagrams.onprem.registry import Harbor
 from diagrams.onprem.security import Trivy
 from diagrams.onprem.tracing import Tempo
-
 from diagrams.programming.language import Bash
+from diagrams.saas.security import Sonarqube
 
 from architecture import Component, edge_attr, graph_attr
-
+from diagrams import Cluster, Diagram, Edge
 
 with Diagram(
     "DevOps",
@@ -27,11 +25,8 @@ with Diagram(
     edge_attr=edge_attr,
     outformat="png",
 ):
-    # ============================================================
-    # SOURCE CONTROL
-    # ============================================================
-
     code_repo = Component("Git Repository", "gitlab")
+    ci_repo = Component("Centralized CI Repository", "gitlab")
     infra_repo = Component("Infra Repository", "gitlab")
     gitops_repo = Component("GitOps Repository", "gitlab")
 
@@ -39,22 +34,27 @@ with Diagram(
     stage_branch = Component("Stage Branch", "git")
     main_branch = Component("Main Branch", "git")
 
-    # ============================================================
-    # BRANCH FLOW
-    # ============================================================
-
+    ci_repo >> code_repo
     dev_branch >> Edge(label="PR") >> stage_branch
     stage_branch >> Edge(label="PR") >> main_branch
 
-    code_repo >> dev_branch
+    with Cluster("Precommit"):
+        lint = Bash("Lint")
+        format = Bash("Format Check")
+        secret_scan = Bash("Secret Scan")
 
-    # ============================================================
-    # INFRASTRUCTURE PROVISIONING
-    # ============================================================
+    (
+        Users("Developer")
+        >> Component("precommit", "git")
+        >> [lint, format, secret_scan]
+        >> Component("git push", "git")
+        >> code_repo
+        >> Component("Feature Branch", "git")
+        >> Edge(label="PR")
+        >> dev_branch
+    )
 
     with Cluster("Infrastructure CI/CD"):
-        # ---------------- DEV ----------------
-
         with Cluster("Dev Infrastructure"):
             dev_infra_cicd = GitlabCI("Dev Infra CI/CD")
             dev_plan = Bash("TF Plan")
@@ -62,16 +62,12 @@ with Diagram(
 
             dev_infra_cicd >> dev_plan >> dev_apply
 
-        # ---------------- STAGE ----------------
-
         with Cluster("Stage Infrastructure"):
             stage_infra_cicd = GitlabCI("Stage Infra CI/CD")
             stage_plan = Bash("TF Plan")
             stage_apply = Bash("TF Apply")
 
             stage_infra_cicd >> stage_plan >> stage_apply
-
-        # ---------------- PROD ----------------
 
         with Cluster("Prod Infrastructure"):
             prod_infra_cicd = GitlabCI("Prod Infra CI/CD")
@@ -85,10 +81,6 @@ with Diagram(
         stage_infra_cicd,
         prod_infra_cicd,
     ]
-
-    # ============================================================
-    # CLOUD
-    # ============================================================
 
     with Cluster("Cloud Services"):
         azure = Component("Azure")
@@ -110,10 +102,6 @@ with Diagram(
                 gcp,
             ]
         )
-
-    # ============================================================
-    # OBSERVABILITY
-    # ============================================================
 
     otel = Component("OpenTelemetry", "otel")
 
@@ -137,51 +125,58 @@ with Diagram(
             prometheus,
         ] >> grafana
 
-    # ============================================================
-    # DEV CI/CD
-    # ============================================================
-
     with Cluster("Dev Environment CI/CD"):
         dev_cicd = GitlabCI("Dev CI/CD")
 
         dev_lint = Bash("Lint")
-        dev_test = Bash("Test")
 
-        dev_quality = Component(
-            "Quality Check",
+        dev_test = Bash("Unit Test")
+
+        dev_sast = Component(
+            "SAST",
             "sonar",
         )
+
+        dev_sca = Trivy("Dependency / SCA")
+
+        dev_quality = Sonarqube("Quality Gate")
 
         dev_build = Bash("Build")
 
         dev_package = Bash("Build Container Image")
 
-        dev_security = Trivy("Image Security Scan")
+        dev_image_scan = Trivy("Container Image Scan")
 
         dev_push = Harbor("Push Image")
 
         dev_gitops = Bash("Update GitOps")
 
+        dev_cicd >> [
+            dev_lint,
+            dev_test,
+            dev_sast,
+            dev_sca,
+        ]
+
+        [
+            dev_lint,
+            dev_test,
+            dev_sast,
+            dev_sca,
+        ] >> dev_quality
+
         (
-            dev_cicd
-            >> dev_lint
-            >> dev_test
-            >> dev_quality
+            dev_quality
             >> dev_build
             >> dev_package
-            >> dev_security
+            >> dev_image_scan
             >> dev_push
             >> dev_gitops
         )
 
     dev_branch >> dev_cicd
 
-    dev_push >> Edge(label="Image")
     dev_gitops >> Edge(label="Git Commit") >> gitops_repo
-
-    # ============================================================
-    # STAGE PROMOTION
-    # ============================================================
 
     with Cluster("Stage Promotion"):
         stage_cicd = GitlabCI("Stage CI/CD")
@@ -197,10 +192,6 @@ with Diagram(
     stage_branch >> stage_cicd
 
     stage_gitops >> Edge(label="Git Commit") >> gitops_repo
-
-    # ============================================================
-    # PROD PROMOTION
-    # ============================================================
 
     with Cluster("Prod Promotion"):
         prod_cicd = GitlabCI("Prod CI/CD")
@@ -218,10 +209,6 @@ with Diagram(
     main_branch >> prod_cicd
 
     prod_gitops >> Edge(label="Git Commit") >> gitops_repo
-
-    # ============================================================
-    # DEV KUBERNETES CLUSTER
-    # ============================================================
 
     with Cluster("DEV Kubernetes Cluster"):
         with Cluster("ArgoCD Namespace"):
@@ -261,13 +248,9 @@ with Diagram(
             "istio",
         )
 
-        dev_reloader = Pod("Reloader")
-
         dev_gateway << dev_service
 
-    # ============================================================
-    # STAGE KUBERNETES CLUSTER
-    # ============================================================
+        dev_reloader = Pod("Reloader")
 
     with Cluster("STAGE Kubernetes Cluster"):
         with Cluster("ArgoCD Namespace"):
@@ -295,27 +278,21 @@ with Diagram(
 
             stage_service = Service("Service")
 
-            (
-                stage_service
-                << stage_deployment
-                << [
-                    stage_cm,
-                    stage_secret,
-                ]
-            )
+            stage_deployment << [
+                stage_cm,
+                stage_secret,
+            ]
+
+            stage_service << stage_deployment
 
         stage_gateway = Component(
             "Gateway API",
             "istio",
         )
 
-        stage_reloader = Pod("Reloader")
-
         stage_gateway << stage_service
 
-    # ============================================================
-    # PROD KUBERNETES CLUSTER
-    # ============================================================
+        stage_reloader = Pod("Reloader")
 
     with Cluster("PROD Kubernetes Cluster"):
         with Cluster("ArgoCD Namespace"):
@@ -343,27 +320,21 @@ with Diagram(
 
             prod_service = Service("Service")
 
-            (
-                prod_service
-                << prod_deployment
-                << [
-                    prod_cm,
-                    prod_secret,
-                ]
-            )
+            prod_deployment << [
+                prod_cm,
+                prod_secret,
+            ]
+
+            prod_service << prod_deployment
 
         prod_gateway = Component(
             "Gateway API",
             "istio",
         )
 
-        prod_reloader = Pod("Reloader")
-
         prod_gateway << prod_service
 
-    # ============================================================
-    # GITOPS → ARGO CD
-    # ============================================================
+        prod_reloader = Pod("Reloader")
 
     (
         gitops_repo
@@ -375,15 +346,8 @@ with Diagram(
         ]
     )
 
-    # ============================================================
-    # OBSERVABILITY
-    # ============================================================
-
-    (
-        [
-            dev_deployment,
-            stage_deployment,
-            prod_deployment,
-        ]
-        >> otel
-    )
+    [
+        dev_deployment,
+        stage_deployment,
+        prod_deployment,
+    ] >> otel
