@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Literal
 
 from diagrams.custom import Custom
@@ -5,14 +6,17 @@ from diagrams.custom import Custom
 
 def Component(label="", icon: str = "", ext: Literal["png", "jpg", "svg"] = "png"):
     if icon == "":
-        icon = f"../icons/{label.lower()}.{ext}"
+        icon = f"../../icons/{label.lower()}.{ext}"
     elif "." in icon:
-        icon = f"../icons/{icon.lower()}"
+        icon = f"../../icons/{icon.lower()}"
     else:
-        icon = f"../icons/{icon.lower()}.{ext}"
+        icon = f"../../icons/{icon.lower()}.{ext}"
     return Custom(label=label, icon_path=icon)
 
 
+get_filename = lambda x: str(x).removesuffix("main.py") + "diagram"
+
+outformat = "png"  # ["png", "jpg", "svg", "pdf", "dot"]
 graph_attr = {
     "rankdir": "LR",
     "splines": "ortho",
@@ -25,5 +29,3 @@ graph_attr = {
 edge_attr = {
     "fontsize": "10",
 }
-
-__init__ = []

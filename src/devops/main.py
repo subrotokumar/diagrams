@@ -1,3 +1,4 @@
+from diagrams import Cluster, Diagram, Edge
 from diagrams.k8s.clusterconfig import Quota
 from diagrams.k8s.compute import Deploy, Pod
 from diagrams.k8s.network import Service
@@ -13,17 +14,16 @@ from diagrams.onprem.tracing import Tempo
 from diagrams.programming.language import Bash
 from diagrams.saas.security import Sonarqube
 
-from architecture import Component, edge_attr, graph_attr
-from diagrams import Cluster, Diagram, Edge
+from architecture import Component, edge_attr, get_filename, graph_attr, outformat
 
 with Diagram(
     "DevOps",
-    filename="diagrams/devops",
+    filename=get_filename(__file__),
     show=False,
     direction="LR",
     graph_attr=graph_attr,
     edge_attr=edge_attr,
-    outformat="png",
+    outformat=outformat,
 ):
     code_repo = Component("Git Repository", "gitlab")
     ci_repo = Component("Centralized CI Repository", "gitlab")

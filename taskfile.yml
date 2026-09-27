@@ -1,0 +1,17 @@
+version: "3"
+
+tasks:
+  default:
+    silent: true
+    aliases: [l, ls, list, ll]
+    cmds: [task --list-all]
+
+  unified_intelligence:
+    silent: true
+    aliases: [ui, rag, agent, iagent]
+    cmds: [air -c src/unified_intelligence/.air.toml]
+
+  devops:
+    silent: true
+    aliases: [pipeline, gitops, cicd, deployment]
+    cmds: [air -c src/devops/.air.toml]

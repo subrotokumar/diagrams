@@ -3,12 +3,12 @@
 env_files = []
 root = "."
 testdata_dir = "testdata"
-tmp_dir = "diagrams"
+tmp_dir = ""
 
 [build]
   args_bin = []
   bin = ""
-  cmd = "uv run src/architecture/devops.py"
+  cmd = "uv run src/unified_intelligence/main.py"
   delay = 1000
   entrypoint = [""]
   exclude_dir = ["assets", "tmp", "vendor", "testdata"]
@@ -18,7 +18,7 @@ tmp_dir = "diagrams"
   follow_symlink = false
   full_bin = ""
   ignore_dangerous_root_dir = false
-  include_dir = ["src/architecture"]
+  include_dir = ["src/unified_intelligence"]
   include_ext = ["go", "py", "tpl", "tmpl", "html"]
   include_file = []
   kill_delay = "0s"

@@ -1,0 +1,7 @@
+{
+    "files.exclude": {
+        "**/.python-version": true,
+        "**/__pycache__": true,
+        "**/tmp": true
+    }
+}

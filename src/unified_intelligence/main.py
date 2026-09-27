@@ -1,3 +1,4 @@
+from diagrams import Cluster, Diagram, Edge
 from diagrams.aws.compute import ECR
 from diagrams.aws.ml import Bedrock
 from diagrams.azure.aimachinelearning import (
@@ -27,17 +28,16 @@ from diagrams.programming.framework import React
 from diagrams.programming.language import Bash, Python
 from diagrams.saas.crm import Zendesk  # stand-in: ServiceNow / Jira / HR ticketing
 
-from architecture import Component, edge_attr, graph_attr
-from diagrams import Cluster, Diagram, Edge
+from architecture import Component, edge_attr, get_filename, graph_attr, outformat
 
 with Diagram(
     "Unified Intelligence Platform",
-    filename="diagrams/unified_intelligence_platform",
+    filename=get_filename(__file__),
     show=False,
     direction="LR",
     graph_attr=graph_attr,
     edge_attr=edge_attr,
-    outformat="png",
+    outformat=outformat,
 ):
     files = Component("Files", "files")
     dev_sre = Users("DEV/SRE")
