@@ -28,7 +28,14 @@ from diagrams.programming.framework import React
 from diagrams.programming.language import Bash, Python
 from diagrams.saas.crm import Zendesk  # stand-in: ServiceNow / Jira / HR ticketing
 
-from architecture import Component, edge_attr, get_filename, graph_attr, outformat
+from architecture import (
+    Component,
+    edge_attr,
+    finalize_svg,
+    get_filename,
+    graph_attr,
+    outformat,
+)
 
 with Diagram(
     "Unified Intelligence Platform",
@@ -203,3 +210,5 @@ with Diagram(
         (vault >> eso >> Edge(label="Sync") >> sk >> reloader >> deploy)
         cm >> reloader
         dev_sre << grafana
+
+finalize_svg(__file__)

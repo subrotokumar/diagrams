@@ -1,3 +1,4 @@
+from architecture import finalize_svg
 from diagrams import Cluster, Diagram, Edge
 from diagrams.k8s.clusterconfig import Quota
 from diagrams.k8s.compute import Deploy, Pod
@@ -351,3 +352,6 @@ with Diagram(
         stage_deployment,
         prod_deployment,
     ] >> otel
+
+
+finalize_svg(__file__)

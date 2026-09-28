@@ -7,11 +7,22 @@ tasks:
     cmds: [task --list-all]
 
   unified_intelligence:
+    dir: src/unified_intelligence
     silent: true
     aliases: [ui, rag, agent, iagent]
-    cmds: [air -c src/unified_intelligence/.air.toml]
+    cmds:
+      - watchexec -w . -e py -- uv run main.py
 
   devops:
+    dir: src/devops
     silent: true
     aliases: [pipeline, gitops, cicd, deployment]
-    cmds: [air -c src/devops/.air.toml]
+    cmds:
+      - watchexec -w . -e py -- uv run main.py
+
+  abs:
+    dir: src/adaptive_bitrate_streaming
+    silent: true
+    aliases: ["adaptive-bitrate-streaming"]
+    cmds:
+      - watchexec -w . -e py -- uv run main.py

@@ -1,15 +1,11 @@
 [project]
 name = "architecture"
 version = "0.1.0"
-description = "Add your description here"
+description = "repository of architecture diagrams"
 readme = "README.md"
-authors = [
-    { name = "subrotokumar", email = "subrotokumar@outlook.in" }
-]
+authors = [{ name = "subrotokumar", email = "subrotokumar@outlook.in" }]
 requires-python = ">=3.14"
-dependencies = [
-    "diagrams>=0.25.1",
-]
+dependencies = ["diagrams>=0.25.1"]
 
 [project.scripts]
 architecture = "architecture:main"
