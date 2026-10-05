@@ -2,6 +2,7 @@
     "files.exclude": {
         "**/.python-version": true,
         "**/__pycache__": true,
-        "**/tmp": true
+        "**/tmp": true,
+        ".vscode": true,
     }
 }

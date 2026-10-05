@@ -10,6 +10,8 @@ from diagrams.k8s.compute import Deploy, Pod
 from diagrams.k8s.podconfig import ConfigMap, Secret
 from diagrams.onprem.ci import Gitlabci
 from diagrams.onprem.client import Client, Users
+from diagrams.onprem.client import Client, Users
+from diagrams.onprem.database import PostgreSQL
 from diagrams.onprem.inmemory import Redis
 from diagrams.onprem.logging import Loki
 from diagrams.onprem.monitoring import Grafana, Prometheus
@@ -24,8 +26,8 @@ from diagrams.programming.flowchart import (
     Preparation,
     Sort,
 )
-from diagrams.programming.framework import React
-from diagrams.programming.language import Bash, Python
+from diagrams.programming.framework import React, Spring
+from diagrams.programming.language import Bash, Java
 from diagrams.saas.crm import Zendesk  # stand-in: ServiceNow / Jira / HR ticketing
 
 from architecture import (
@@ -50,14 +52,16 @@ with Diagram(
     dev_sre = Users("DEV/SRE")
     eval = MachineLearning("Eval\n(faithfulness, relevance,\ncontext precision)")
     react = React("Client")
+    db = PostgreSQL("Database")
 
     with Cluster("Agent Service"):
+        agent_sevice = Spring("Agent Service")
         supervisor = Component("Multi-Agent\nSupervisor", "langgraph")
 
         with Cluster("Rag Agent Handoff"):
             agent1 = Component("RAG Agent", "langgraph")
-            llm = Python("LLM")
-            tools = Python("Tools")
+            llm = Java("LLM\nChat Completion")
+            tools = Java("Tools")
 
         agent2 = Component(
             "HR Agent\nJira Agent\nSolution Architect Agent\nSupport Agent\nBA Agent",
@@ -124,7 +128,7 @@ with Diagram(
         ollama = Component("Ollama", "ollama")
         bedrock = Bedrock("Bedrock")
         huggingface = Component("HuggingFace", "huggingface")
-        router = Component("Routing\n(cost / latency /\ncontext window)", "go")
+        router = Spring("Routing\n(cost / latency /\ncontext window)")
         (
             [openai, ollama, bedrock, huggingface]
             >> Edge(label="parallel tool calls\n+ retry/fallback")
@@ -148,7 +152,9 @@ with Diagram(
     user = Users("Users")
     user >> files
     user >> react
-    react >> supervisor
+    react >> agent_sevice >> supervisor
+    db >> agent_sevice
+    agent_sevice >> otel
     vectordb = [aisearch, pgvector, opensearch]
     emb_image >> aisearch
     emb_text >> pgvector
