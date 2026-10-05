@@ -201,11 +201,14 @@ with Diagram(
 
         prod_approval = Bash("Manual Approval")
 
+        prod_tag_generation = Bash("Manual Approval")
+
         prod_promote = Bash("Promote Image")
 
         prod_gitops = Bash("Update GitOps")
 
-        (prod_cicd >> prod_validate >> prod_approval >> prod_promote >> prod_gitops)
+        (prod_cicd >> prod_validate >> prod_approval >> prod_tag_generation >> prod_promote >> prod_gitops)
+        code_repo << prod_tag_generation
 
     main_branch >> prod_cicd
 
