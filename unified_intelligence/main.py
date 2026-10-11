@@ -1,3 +1,5 @@
+from diagrams.programming.language import Python
+from diagrams.programming.framework import FastAPI
 from diagrams import Cluster, Diagram, Edge
 from diagrams.aws.compute import ECR
 from diagrams.aws.ml import Bedrock
@@ -39,6 +41,10 @@ from architecture import (
     outformat,
 )
 
+py = True
+Router = FastAPI if py else Spring
+Tool = Python if py else Java
+
 with Diagram(
     "Unified Intelligence Platform",
     filename=get_filename(__file__),
@@ -60,8 +66,8 @@ with Diagram(
 
         with Cluster("Rag Agent Handoff"):
             agent1 = Component("RAG Agent", "langgraph")
-            llm = Java("LLM\nChat Completion")
-            tools = Java("Tools")
+            llm = Python("LLM\nChat Completion")
+            tools = Python("Tools")
 
         agent2 = Component(
             "HR Agent\nJira Agent\nSolution Architect Agent\nSupport Agent\nBA Agent",
@@ -128,7 +134,7 @@ with Diagram(
         ollama = Component("Ollama", "ollama")
         bedrock = Bedrock("Bedrock")
         huggingface = Component("HuggingFace", "huggingface")
-        router = Spring("Routing\n(cost / latency /\ncontext window)")
+        router = Router("Routing\n(cost / latency /\ncontext window)")
         (
             [openai, ollama, bedrock, huggingface]
             >> Edge(label="parallel tool calls\n+ retry/fallback")
@@ -174,7 +180,7 @@ with Diagram(
     (files >> presigned_url << Edge(label="Signed URL") << storage)
     presigned_url >> Edge(label="Uploading file") >> storage
     llm << router
-
+    storage << image_data
     with Cluster("DevOps"):
         cloud = Component("Cloud Infrastructure", "clouds")
 
