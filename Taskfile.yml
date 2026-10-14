@@ -7,11 +7,11 @@ tasks:
     cmds:
       - watchexec -w . -e py -- uv run main.py
 
-  devops:
-    desc: "DevSecOps | GitOps | CICD | Kubernetes"
-    dir: devops
+  infrastructure:
+    desc: "Infrastructure, DevSecOps | GitOps | CICD | Kubernetes"
+    dir: infrastructure
     silent: true
-    aliases: [pipeline, gitops, cicd, deployment]
+    aliases: [devops, pipeline, gitops, cicd, deployment]
     cmds:
       - watchexec -w . -e py -- uv run main.py
 

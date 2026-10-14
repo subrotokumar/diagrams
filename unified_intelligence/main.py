@@ -1,3 +1,10 @@
+
+from diagrams.onprem.database import Postgresql
+from diagrams.aws.database import RDS, RDSInstance, RDSPostgresqlInstance
+from diagrams.aws.database import ElastiCache
+from diagrams.aws.compute import EKS
+from diagrams.onprem.queue import RabbitMQ
+from diagrams.aws import AWS
 from diagrams.programming.language import Python
 from diagrams.programming.framework import FastAPI
 from diagrams import Cluster, Diagram, Edge
@@ -7,6 +14,7 @@ from diagrams.azure.aimachinelearning import (
     AzureOpenai,
     MachineLearning,
 )
+from functools import partial
 from diagrams.k8s import K8S
 from diagrams.k8s.compute import Deploy, Pod
 from diagrams.k8s.podconfig import ConfigMap, Secret
@@ -18,6 +26,9 @@ from diagrams.onprem.inmemory import Redis
 from diagrams.onprem.logging import Loki
 from diagrams.onprem.monitoring import Grafana, Prometheus
 from diagrams.onprem.queue import Kafka
+from diagrams.aws.integration import SQS
+from diagrams.aws.security import SecretsManager
+
 from diagrams.onprem.search import Solr  # BM25 keyword search
 from diagrams.onprem.security import Vault  # stand-in: Zanzibar-style permission engine
 from diagrams.onprem.tracing import Tempo
@@ -41,9 +52,16 @@ from architecture import (
     outformat,
 )
 
-py = True
-Router = FastAPI if py else Spring
-Tool = Python if py else Java
+CloudInfra = partial(Component, "Cloud Infrastructure")
+
+
+Backend, Tool = [FastAPI, Spring][0], [Python, Java][0]
+SecretManager = [Vault, SecretsManager][1]
+Broker = [SQS, Kafka, RabbitMQ][0]
+CloudInfra = [CloudInfra, AWS][1]
+K8sDistro = [K8S, EKS][1]
+Cache = [ElastiCache, Redis][0]
+database = [PostgreSQL, RDS, RDSPostgresqlInstance][2]
 
 with Diagram(
     "Unified Intelligence Platform",
@@ -58,10 +76,9 @@ with Diagram(
     dev_sre = Users("DEV/SRE")
     eval = MachineLearning("Eval\n(faithfulness, relevance,\ncontext precision)")
     react = React("Client")
-    db = PostgreSQL("Database")
-
+    db = database("Database")
     with Cluster("Agent Service"):
-        agent_sevice = Spring("Agent Service")
+        agent_sevice = Backend("Agent Service")
         supervisor = Component("Multi-Agent\nSupervisor", "langgraph")
 
         with Cluster("Rag Agent Handoff"):
@@ -84,7 +101,7 @@ with Diagram(
         with Cluster("Document Ingestion"):
             presigned_url = Client("Presigned URL\nUpload")
             storage = Component("Object Storage", "s3")
-        kafka = Kafka("Message Broker\n(upload events)")
+        kafka = Broker("Message Broker\n(upload events)")
         workers = Component("KEDA-scaled\nIngestion Workers", "keda")
 
         with Cluster("Multi-Model Embeddings Pipeline"):
@@ -110,10 +127,11 @@ with Diagram(
                 emb_image = Component("Image\nEmbedding\n[f1,f2,...fn]", "numpy")
                 image_data >> image_summary >> emb_image
 
-    with Cluster("VectorDB"):
+    with Cluster():
         aisearch = Database("Image\nCollection")
         pgvector = Database("Text\nCollection")
         opensearch = Database("Table Collection")
+        Postgresql  ("PgVector")
 
     otel = Component("OTel", "otel")
 
@@ -134,7 +152,7 @@ with Diagram(
         ollama = Component("Ollama", "ollama")
         bedrock = Bedrock("Bedrock")
         huggingface = Component("HuggingFace", "huggingface")
-        router = Router("Routing\n(cost / latency /\ncontext window)")
+        router = Backend("Routing\n(cost / latency /\ncontext window)")
         (
             [openai, ollama, bedrock, huggingface]
             >> Edge(label="parallel tool calls\n+ retry/fallback")
@@ -142,7 +160,7 @@ with Diagram(
         )
 
     with Cluster("Retrieval Pipeline"):
-        cache = Redis("Semantic Cache")
+        cache = Cache("Semantic Cache")
         hyde = Preparation("HyDE Query\nRewrite")
         with Cluster("Hybrid Search"):
             dense = InternalStorage("Dense Vector\nSearch")
@@ -152,7 +170,7 @@ with Diagram(
 
     with Cluster("Access Control (Zanzibar-style)"):
         sources = Zendesk("ServiceNow / Jira /\nHR Platform")
-        permissions = Vault("Relationship-based\nPermission Engine")
+        permissions = SecretManager("Relationship-based\nPermission Engine")
         sources >> Edge(label="live relationships") >> permissions
 
     user = Users("Users")
@@ -182,18 +200,18 @@ with Diagram(
     llm << router
     storage << image_data
     with Cluster("DevOps"):
-        cloud = Component("Cloud Infrastructure", "clouds")
+        cloud = CloudInfra("clouds")
 
         infra_repo = Component("Infra Repository", "gitlab")
         codebase = Component("Codebase\nRepository", "gitlab")
         helm = Component("Helm Chart\nRepository", "helm")
         argocd = Component("ArgoCD", "argocd")
-        vault = Vault("Secret Vault")
+        vault = SecretManager("Secret Vault")
         registry = ECR("Image Registry")
 
         with Cluster("Kubernetes Cluster"):
             istio = Component("Gateway API", "istio")
-            k8s = K8S("Kubernetes")
+            k8s = K8sDistro("Kubernetes")
             reloader = Pod("Reloader")
             eso = Component("ESO", "eso")
             with Cluster("Application"):

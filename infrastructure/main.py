@@ -1,3 +1,8 @@
+from diagrams.aws.network import ALB
+from diagrams.aws.network import APIGateway
+from diagrams.aws.storage import EFS
+from diagrams.aws.compute import ECS
+from diagrams.k8s.compute import Cronjob
 from architecture import finalize_svg
 from diagrams import Cluster, Diagram, Edge
 from diagrams.k8s.clusterconfig import Quota
@@ -14,6 +19,14 @@ from diagrams.onprem.security import Trivy
 from diagrams.onprem.tracing import Tempo
 from diagrams.programming.language import Bash
 from diagrams.saas.security import Sonarqube
+from diagrams.aws.storage import S3
+from diagrams.aws.database import RDS, Redshift, ElastiCache
+from diagrams.aws.compute import ECR, ECR, EKS, EC2
+from diagrams.aws.network import CloudFront, Route53
+from diagrams.aws.ml import Bedrock
+
+
+
 
 from architecture import Component, edge_attr, get_filename, graph_attr, outformat
 
@@ -77,11 +90,10 @@ with Diagram(
 
             prod_infra_cicd >> prod_plan >> prod_apply
 
-    infra_repo >> [
-        dev_infra_cicd,
-        stage_infra_cicd,
-        prod_infra_cicd,
-    ]
+    infra_repo >> Edge(label="Dev Branch") >> dev_infra_cicd
+    infra_repo >> Edge(label="Stage Branch") >> stage_infra_cicd
+    infra_repo >> Edge(label="Prod Branch") >>   prod_infra_cicd,
+
 
     with Cluster("Cloud Services"):
         azure = Component("Azure")
@@ -96,13 +108,31 @@ with Diagram(
                 stage_apply,
                 prod_apply,
             ]
-            >> terraform
+            - terraform
             >> [
                 azure,
                 aws,
                 gcp,
             ]
         )
+    
+    with Cluster("AWS"):
+        with Cluster("Compute"):
+            ec2 = EC2()
+            ec2 - ECR() - ECS() - EKS()
+        with Cluster("Database"):
+            rds = RDS()
+            rds - Redshift() -   ElastiCache()
+        with Cluster("ML"):
+            bedrock = Bedrock()
+        with Cluster("Storage"):
+            s3 = S3()
+            s3 - EFS()
+        with Cluster("Network"):
+            cloudfront = CloudFront()
+            cloudfront - APIGateway() -  ALB() - Route53()
+
+    aws - [ec2, rds, bedrock, s3, cloudfront]
 
     otel = Component("OpenTelemetry", "otel")
 
@@ -215,6 +245,15 @@ with Diagram(
     prod_gitops >> Edge(label="Git Commit") >> gitops_repo
 
     with Cluster("DEV Kubernetes Cluster"):
+        with Cluster("KEDA"):
+            Component("","keda")
+        
+        with Cluster("Serverless"):
+            Component("Knative","knative")
+        
+        with Cluster("Virtualization "):
+            Component("KubeVirt","kubevirt")
+
         with Cluster("ArgoCD Namespace"):
             dev_argocd = Component(
                 "Argo CD",
@@ -223,6 +262,7 @@ with Diagram(
 
         with Cluster("Application Namespace"):
             dev_deployment = Deploy("Deployment")
+            dev_cj = Cronjob("CronJob")
 
             with Cluster("Pod Config"):
                 dev_cm = ConfigMap("ConfigMap")
@@ -243,20 +283,30 @@ with Diagram(
             dev_deployment << [
                 dev_cm,
                 dev_secret,
-            ]
+            ] >> dev_cj
 
             dev_service << dev_deployment
 
-        dev_gateway = Component(
-            "Gateway API",
-            "istio",
-        )
+        with Cluster("Gateway API & Service Mesh"):
+            dev_gateway = Component(
+                "Istio Service Mesh",
+                "istio",
+            )
 
         dev_gateway << dev_service
 
         dev_reloader = Pod("Reloader")
 
     with Cluster("STAGE Kubernetes Cluster"):
+        with Cluster("KEDA"):
+            Component("","keda")
+
+        with Cluster("Serverless"):
+            Component("Knative","knative")
+
+        with Cluster("Virtualization "):
+            Component("KubeVirt","kubevirt")
+
         with Cluster("ArgoCD Namespace"):
             stage_argocd = Component(
                 "Argo CD",
@@ -265,6 +315,7 @@ with Diagram(
 
         with Cluster("Application Namespace"):
             stage_deployment = Deploy("Deployment")
+            stage_cj = Cronjob("CronJob")
 
             with Cluster("Pod Config"):
                 stage_cm = ConfigMap("ConfigMap")
@@ -285,20 +336,27 @@ with Diagram(
             stage_deployment << [
                 stage_cm,
                 stage_secret,
-            ]
+            ] >> stage_cj
 
             stage_service << stage_deployment
 
-        stage_gateway = Component(
-            "Gateway API",
-            "istio",
-        )
+        with Cluster("Gateway API & Service Mesh"):
+            stage_gateway = Component("Istio", "istio")
 
         stage_gateway << stage_service
 
         stage_reloader = Pod("Reloader")
 
     with Cluster("PROD Kubernetes Cluster"):
+        with Cluster("KEDA"):
+            Component("","keda")
+
+        with Cluster("Serverless"):
+            Component("Knative","knative")
+        
+        with Cluster("Virtualization "):
+            Component("KubeVirt","kubevirt")
+            
         with Cluster("ArgoCD Namespace"):
             prod_argocd = Component(
                 "Argo CD",
@@ -307,6 +365,7 @@ with Diagram(
 
         with Cluster("Application Namespace"):
             prod_deployment = Deploy("Deployment")
+            prod_cj = Cronjob("CronJob")
 
             with Cluster("Pod Config"):
                 prod_cm = ConfigMap("ConfigMap")
@@ -327,14 +386,14 @@ with Diagram(
             prod_deployment << [
                 prod_cm,
                 prod_secret,
-            ]
+            ] >> prod_cj
 
             prod_service << prod_deployment
 
-        prod_gateway = Component(
-            "Gateway API",
-            "istio",
-        )
+        
+        with Cluster("Gateway API & Service Mesh"):
+            prod_gateway = Component("Istio", "istio")
+
 
         prod_gateway << prod_service
 
